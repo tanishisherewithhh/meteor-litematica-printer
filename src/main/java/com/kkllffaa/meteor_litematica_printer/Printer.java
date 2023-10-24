@@ -21,6 +21,8 @@ import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.Utils;
+import meteordevelopment.meteorclient.utils.misc.BaritoneUtils;
+import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.meteorclient.utils.render.color.Color;
@@ -36,6 +38,7 @@ import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.packet.c2s.play.CreativeInventoryActionC2SPacket;
 import net.minecraft.state.property.Properties;
+import net.minecraft.text.Text;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -64,6 +67,26 @@ public class Printer extends Module {
 			.max(100).sliderMax(40)
 			.build()
 	);
+    private final Setting<Integer> travel_range = sgGeneral.add(new IntSetting.Builder()
+        .name("Travelling range")
+        .description("The range for travelling to a unplaced schematic block using baritone. (Max = 10k) (More == laggy and slower but useful sometimes) ")
+        .defaultValue(2)
+        .min(1)
+        .sliderMin(25)
+        .max(10000)
+        .sliderMax(100)
+        .build()
+    );
+    private final Setting<Integer> travel_delay = sgGeneral.add(new IntSetting.Builder()
+        .name("Travelling delay")
+        .description("Delay between travelling to a unplaced schematic block using baritone (in ticks)")
+        .defaultValue(2)
+        .min(0)
+        .sliderMin(3)
+        .max(500)
+        .sliderMax(200)
+        .build()
+    );
 
 	private final Setting<Integer> bpt = sgGeneral.add(new IntSetting.Builder()
 			.name("blocks/tick")
@@ -185,9 +208,10 @@ public class Printer extends Module {
         .build()
     );
 
-    private int timer;
+    private int timer, goTimer = 0;
     private int usedSlot = -1;
     private final List<BlockPos> toSort = new ArrayList<>();
+    private final List<BlockPos> gotoSort = new ArrayList<>();
     private final List<Pair<Integer, BlockPos>> placed_fade = new ArrayList<>();
 
 
@@ -207,6 +231,7 @@ public class Printer extends Module {
 	@Override
     public void onDeactivate() {
 		placed_fade.clear();
+        ChatUtils.sendPlayerMsg("#stop");
 	}
 
 	@EventHandler
@@ -227,7 +252,7 @@ public class Printer extends Module {
 		}
 
 		toSort.clear();
-
+        gotoSort.clear();
 
 		if (timer >= printing_delay.get()) {
 			BlockIterator.register(printing_range.get() + 1, printing_range.get() + 1, (pos, blockState) -> {
@@ -307,7 +332,35 @@ public class Printer extends Module {
 
 
 		} else timer++;
-	}
+
+            BlockIterator.register(travel_range.get() + 1, travel_range.get() + 1, (pos, blockState) -> {
+                BlockState required = worldSchematic.getBlockState(pos);
+
+                if (    blockState.isReplaceable()
+                        && !required.isAir()
+                        && blockState.getBlock() != required.getBlock()
+                        && required.canPlaceAt(mc.world, pos)
+                ) {
+                    gotoSort.add(new BlockPos(pos));
+                }
+            });
+           // Sort blocks by distance to player
+        BlockIterator.after(()->{
+            Comparator<BlockPos> comparator = Comparator.comparingDouble((BlockPos pos) -> mc.player.getBlockPos().getSquaredDistance(pos.getX(), pos.getY(), pos.getZ()));
+            gotoSort.sort(comparator);
+            for(BlockPos blockPos: gotoSort){
+                if(mc.player.getBlockPos() != blockPos && mc.player.getBlockPos().toCenterPos().distanceTo(blockPos.toCenterPos())> 5 + 1) {
+                    if(goTimer>travel_delay.get()) {
+                        goTimer = 0;
+                        ChatUtils.sendPlayerMsg("#goto " + (int) blockPos.getX() + " " + (int) blockPos.getY() + " " + (int) blockPos.getZ());
+                    }else goTimer++;
+                    break;
+                }
+            }
+        });
+
+
+    }
 
 	public boolean place(BlockState required, BlockPos pos) {
 

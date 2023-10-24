@@ -1,14 +1,15 @@
 {
   "schemaVersion": 1,
-  "name": "Meteor Litematica Printer",
-  "id": "meteor-litematica-printer",
+  "name": "Meteor Litematica Printer Advanced",
+  "id": "meteor-litematica-printer-advanced",
   "version": "${version}",
-  "description": "Fast printer for litematica made with meteor.",
+  "description": "Fast printer for litematica made with meteor. Automatically uses baritone to travel to unplaced regions",
   "authors": [
-    "kkllffaa"
+    "kkllffaa",
+    "tanishisherewith"
   ],
   "contact": {
-    "repo": "https://github.com/kkllffaa/meteor-litematica-printer"
+    "repo": "https://github.com/tanishisherewithhh/meteor-litematica-printer"
   },
   "icon": "assets/meteor_litematica_printer/icon.png",
   "environment": "client",
