@@ -2,6 +2,8 @@
 
 Fast printer to litematica mod without rubberbanding
 
+## [Tutorial Video](https://clipchamp.com/watch/Vh1qFgzOsmd?utm_source=share&utm_medium=social&utm_campaign=watch)
+
 Litematica printer addon for meteor [1.4 advanced](https://github.com/tanishisherewithhh/meteor-litematica-printer/releases/tag/1.4v).
 
 This version improves baritone functioning. It also includes restock feature by placing and breaking shulkers from the hotbar.
