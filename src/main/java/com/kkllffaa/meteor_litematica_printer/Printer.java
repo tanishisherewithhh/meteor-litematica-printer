@@ -285,9 +285,14 @@ public class Printer extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
+
         if (mc.player == null || mc.world == null || mc.interactionManager == null) {
             placed_fade.clear();
             return;
+        }
+        if(restock.get() && restockFromPlatform.get() ){
+            error("You cant have restock and restockFromPlatform both enabled... Turning off restockFromPlatform");
+            restockFromPlatform.set(false);
         }
 
         placed_fade.forEach(s -> s.setLeft(s.getLeft() - 1));
@@ -385,13 +390,9 @@ public class Printer extends Module {
             restockItems.get().forEach(item -> {
                 if (InvUtils.find(item).count() <= 5 || !InvUtils.find(item).found()) {
                     restocking = true;
-                    System.out.println("Restocking");
                     ChatUtils.sendMsg(Text.of("Restocking"));
                     shouldTravel = false;
                     BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
-                }
-                else if(restocking){
-                    restocking = false;
                 }
             });
         }
@@ -399,12 +400,10 @@ public class Printer extends Module {
         if(restockFromPlatform.get() && !restocking && !mc.player.isCreative()){
             restockItems.get().forEach(item -> {
                 if (InvUtils.find(item).count() <= 5 || !InvUtils.find(item).found()) {
-                    System.out.println("Restocking");
                     ChatUtils.sendMsg(Text.of("Restocking"));
                     shouldTravel = false;
                     restocking = true;
                     BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
-                    restockFromPlatform();
                 }
             });
         }
@@ -444,11 +443,25 @@ public class Printer extends Module {
             delayTicks--;
             return;
         }
-        if (restocking && blockBroken) {
-            BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
-            restockFromShulker();
-            blockBroken = false;
-            if (target != null) {
+        if (restocking) {
+            if(restockFromPlatform.get()){
+                restockFromPlatform();
+                restockItems.get().forEach(item -> {
+                    if (InvUtils.find(item).count() >= 5 || InvUtils.find(item).found()) {
+                        shouldTravel = true;
+                        restocking = false;
+                    }
+                    else if (InvUtils.find(item).count() <= 5 || !InvUtils.find(item).found()) {
+                        shouldTravel = false;
+                        restocking = true;
+                    }
+                });
+            }
+            if(restock.get() &&  blockBroken) {
+                restockFromShulker();
+                blockBroken = false;
+            }
+            if (target != null  && blockBroken) {
                 Vec3d hitPos = new Vec3d(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5);
                 BlockUtils.interact(new BlockHitResult(hitPos, Direction.UP, target, false), Hand.MAIN_HAND, true);
             }
