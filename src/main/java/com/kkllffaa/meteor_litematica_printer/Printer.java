@@ -12,6 +12,7 @@ import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.systems.modules.render.WaypointsModule;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
@@ -30,6 +31,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.packet.c2s.play.CloseHandledScreenC2SPacket;
 import net.minecraft.network.packet.c2s.play.CreativeInventoryActionC2SPacket;
 import net.minecraft.state.property.Properties;
 import net.minecraft.text.Text;
@@ -48,6 +50,8 @@ import java.util.function.Supplier;
 public class Printer extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgWhitelist = settings.createGroup("Whitelist");
+    private final SettingGroup sgRestock = settings.createGroup("Restock");
+    private final SettingGroup sgAutoTravel = settings.createGroup("Auto Travel");
     private final SettingGroup sgRendering = settings.createGroup("Rendering");
 
     private final Setting<Integer> printing_range = sgGeneral.add(new IntSetting.Builder()
@@ -67,32 +71,45 @@ public class Printer extends Module {
         .max(100).sliderMax(40)
         .build()
     );
-    private final Setting<Boolean> restock = sgGeneral.add(new BoolSetting.Builder()
+    private final Setting<Boolean> restock = sgRestock.add(new BoolSetting.Builder()
         .name("Restock")
         .description("Restock from shulker")
         .defaultValue(false)
         .build()
     );
-    private final Setting<Boolean> minePickaxe = sgGeneral.add(new BoolSetting.Builder()
+    private final Setting<Boolean> restockFromPlatform = sgRestock.add(new BoolSetting.Builder()
+        .name("Platform Restock")
+        .description("Travel to Platform pos for manual restock")
+        .defaultValue(false)
+        .build()
+    );
+    private final Setting<Boolean> minePickaxe = sgRestock.add(new BoolSetting.Builder()
         .name("Mine Pickaxe")
         .description("Mine the shulker with the best tool available in the hotbar")
         .defaultValue(true)
         .build()
     );
 
-    private final Setting<List<Item>> restockItems = sgGeneral.add(new ItemListSetting.Builder()
+    private final Setting<List<Item>> restockItems = sgRestock.add(new ItemListSetting.Builder()
         .name("Items")
         .description("Items to restock.")
         .build()
     );
+    private final Setting<BlockPos> platformPos = sgRestock.add(new BlockPosSetting.Builder()
+        .name("Platform Pos")
+        .description("Platform Position to travel to.")
+        .defaultValue(new BlockPos(0,0,0))
+        .build()
+    );
 
-    private final Setting<Boolean> travel = sgGeneral.add(new BoolSetting.Builder()
+
+    private final Setting<Boolean> travel = sgAutoTravel.add(new BoolSetting.Builder()
         .name("Travel")
         .description("Travel to a unplaced schematic block using baritone")
         .defaultValue(false)
         .build()
     );
-    private final Setting<Integer> travel_range = sgGeneral.add(new IntSetting.Builder()
+    private final Setting<Integer> travel_range = sgAutoTravel.add(new IntSetting.Builder()
         .name("Travelling range")
         .description("The range for travelling to a unplaced schematic block using baritone. (Max = 10k) (More == laggy and slower but useful sometimes) ")
         .defaultValue(2)
@@ -102,7 +119,7 @@ public class Printer extends Module {
         .sliderMax(100)
         .build()
     );
-    private final Setting<Integer> travel_delay = sgGeneral.add(new IntSetting.Builder()
+    private final Setting<Integer> travel_delay = sgAutoTravel.add(new IntSetting.Builder()
         .name("Travelling delay")
         .description("Delay between travelling to a unplaced schematic block using baritone (in ticks)")
         .defaultValue(2)
@@ -236,8 +253,7 @@ public class Printer extends Module {
     private final List<BlockPos> gotoSort = new ArrayList<>();
     private final List<Pair<Integer, BlockPos>> placed_fade = new ArrayList<>();
     private int timer, goTimer = 0;
-    private BlockPos target;
-    private Thread restockThread;
+    private BlockPos target, baritoneGoal;
     private boolean restocking = false, shouldTravel = true, blockBroken = true;
     private int delayTicks = 0;
     private int usedSlot = -1;
@@ -248,7 +264,7 @@ public class Printer extends Module {
     // https://github.com/CCBlueX/LiquidBounce/blob/nextgen/src/main/kotlin/net/ccbluex/liquidbounce/utils/aiming/RotationsUtil.kt#L257
 
     public Printer() {
-        super(Addon.CATEGORY, "litematica-printer", "Automatically prints open schematics");
+        super(Addon.CATEGORY, "litematica-printer advanced", "Automatically prints open schematics, restocks and auto travels to unplaced schematic parts using baritone");
     }
 
     @Override
@@ -261,10 +277,10 @@ public class Printer extends Module {
         placed_fade.clear();
         target = null;
         BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
-        restockThread = null;
         restocking = false;
         shouldTravel = true;
         blockBroken = true;
+        baritoneGoal = null;
     }
 
     @EventHandler
@@ -365,7 +381,22 @@ public class Printer extends Module {
 
         } else timer++;
 
-        if (restock.get() && !restocking && !mc.player.isCreative()) {
+        if (restock.get() && !restocking && !mc.player.isCreative() && !restockFromPlatform.get()) {
+            restockItems.get().forEach(item -> {
+                if (InvUtils.find(item).count() <= 5 || !InvUtils.find(item).found()) {
+                    restocking = true;
+                    System.out.println("Restocking");
+                    ChatUtils.sendMsg(Text.of("Restocking"));
+                    shouldTravel = false;
+                    BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
+                }
+                else if(restocking){
+                    restocking = false;
+                }
+            });
+        }
+
+        if(restockFromPlatform.get() && !restocking && !mc.player.isCreative()){
             restockItems.get().forEach(item -> {
                 if (InvUtils.find(item).count() <= 5 || !InvUtils.find(item).found()) {
                     System.out.println("Restocking");
@@ -373,6 +404,7 @@ public class Printer extends Module {
                     shouldTravel = false;
                     restocking = true;
                     BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
+                    restockFromPlatform();
                 }
             });
         }
@@ -398,7 +430,8 @@ public class Printer extends Module {
                     if (currentPos != blockPos && mc.player.getBlockPos().toCenterPos().distanceTo(blockPos.toCenterPos()) >= 5) {
                         if (goTimer > travel_delay.get()) {
                             goTimer = 0;
-                            Goal goal = new GoalGetToBlock(findNearestSolidBlock(blockPos));
+                            baritoneGoal = findNearestSolidBlock(blockPos);
+                            Goal goal = new GoalGetToBlock(baritoneGoal);
                             BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(goal);
                         } else goTimer++;
                         break;
@@ -519,6 +552,19 @@ public class Printer extends Module {
 
         Vec3d hitPos = new Vec3d(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5);
         BlockUtils.interact(new BlockHitResult(hitPos, Direction.UP, target, false), Hand.MAIN_HAND, true);
+    }
+    public void restockFromPlatform() {
+        if (mc.player == null || mc.interactionManager == null || mc.world == null) return;
+
+        baritoneGoal = platformPos.get();
+        blockBroken = false;
+
+        Goal goal = new GoalGetToBlock(platformPos.get());
+        BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(goal);
+
+        if (PlayerUtils.isWithinReach(platformPos.get())) {
+            info("Reached near platformPos");
+        }
     }
 
     public boolean place(BlockState required, BlockPos pos) {
@@ -669,6 +715,10 @@ public class Printer extends Module {
             Color a = new Color(colour.get().r, colour.get().g, colour.get().b, (int) (((float) s.getLeft() / (float) fadeTime.get()) * colour.get().a));
             event.renderer.box(s.getRight(), a, null, ShapeMode.Sides, 0);
         });
+        if(baritoneGoal !=null){
+            Color a = new Color(10,255,25,(int) (((float) 10 / (float) fadeTime.get()) * colour.get().a));
+            event.renderer.box(baritoneGoal, a, null, ShapeMode.Sides, 0);
+        }
     }
 
     public boolean isShulkerBox(Block block) {
