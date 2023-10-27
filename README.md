@@ -40,3 +40,7 @@ If used with proper settings, it can be fast.
 - Add `Items` in the item setting which should be check for restocking.
 
 - Decrease `block/tick` if blocks aren't being placed properly
+
+
+# Credits
+Thanks kkllffaa for the orignal addon [Meteor Litematica Printer](https://github.com/kkllffaa/meteor-litematica-printer#meteor-litematica-printer)
