@@ -129,6 +129,23 @@ public class Printer extends Module {
         .sliderMax(200)
         .build()
     );
+    private final Setting<Boolean> travelInLayer = sgAutoTravel.add(new BoolSetting.Builder()
+        .name("Travel Layer")
+        .description("Travel to a unplaced schematic block in a layer using baritone")
+        .defaultValue(false)
+        .build()
+    );
+    private final Setting<Integer> travelY = sgAutoTravel.add(new IntSetting.Builder()
+        .name("Travel Y")
+        .description("Travel to a unplaced schematic block in the level of the Y using baritone")
+        .defaultValue(0)
+        .max(320)
+        .min(-100)
+        .sliderMin(-64)
+        .sliderMax(320)
+        .visible(travelInLayer::get)
+        .build()
+    );
 
     private final Setting<Integer> bpt = sgGeneral.add(new IntSetting.Builder()
         .name("blocks/tick")
@@ -416,7 +433,14 @@ public class Printer extends Module {
                     && !required.isAir()
                     && required.canPlaceAt(mc.world, pos)
                 ) {
-                    gotoSort.add(new BlockPos(pos));
+                    if(travelInLayer.get()){
+                        if(pos.getY() == travelY.get()) {
+                            gotoSort.add(new BlockPos(pos));
+                        }
+                    }
+                    else{
+                        gotoSort.add(new BlockPos(pos));
+                    }
                 }
             });
             BlockPos currentPos = mc.player.getBlockPos();
@@ -457,11 +481,11 @@ public class Printer extends Module {
                     }
                 });
             }
-            if(restock.get() &&  blockBroken) {
+            if(restock.get() && blockBroken) {
                 restockFromShulker();
                 blockBroken = false;
             }
-            if (target != null  && blockBroken) {
+            if (target != null && !blockBroken) {
                 Vec3d hitPos = new Vec3d(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5);
                 BlockUtils.interact(new BlockHitResult(hitPos, Direction.UP, target, false), Hand.MAIN_HAND, true);
             }
