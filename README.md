@@ -2,13 +2,15 @@
 
 Fast printer to litematica mod without rubberbanding
 
+## [Tutorial Video](https://clipchamp.com/watch/Vh1qFgzOsmd?utm_source=share&utm_medium=social&utm_campaign=watch)
+
 Litematica printer addon for meteor [1.4 advanced](https://github.com/tanishisherewithhh/meteor-litematica-printer/releases/tag/1.4v).
 
 This version improves baritone functioning. It also includes restock feature by placing and breaking shulkers from the hotbar.
 
 ### Restock feature includes:
 
-- Place a shulker from the hotbar if an item in the `Item` setting is less than 5. (It does not support items in inventory)
+- Place a shulker from the hotbar if an item in the `Item` setting is less than 5. (It does not support shulker in inventory)
 - It does not automatically take items from the shulker. So, you need to enable inventory tweak's `auto steal`. You also need to add the shulker box screen to the `steal screen` and select _items to auto steal_.
 - After 5 seconds, the addon automatically breaks the shulker. Incase the shulker breaks too quickly, switch from a pickaxe to hand.
 - It will find the nearest block to place the shulker on (similar to echest farmer).
@@ -29,12 +31,16 @@ If used with proper settings, it can be fast.
 
 # FAQ fixes:
 
-- Increase Travel Range if baritone can't find an unplaced region.
+- Increase `Travel Range` if baritone can't find an unplaced region.
 
-- Increase Travel delay so that baritone moves less frequently and allows enough time to place blocks.
+- Increase `Travel delay` so that baritone moves less frequently and allows enough time to place blocks.
 
-- If baritone gets stuck increase Travel delay. 
+- If baritone gets stuck increase `Travel delay`. 
 
 - Add `Items` in the item setting which should be check for restocking.
 
-- Decrease block tick if blocks aren't being placed properly
+- Decrease `block/tick` if blocks aren't being placed properly
+
+
+# Credits
+Thanks kkllffaa for the orignal addon [Meteor Litematica Printer](https://github.com/kkllffaa/meteor-litematica-printer#meteor-litematica-printer)
